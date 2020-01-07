@@ -1,0 +1,5 @@
+BEGIN;
+
+DROP USERS
+
+COMMIT;
