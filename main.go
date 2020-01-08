@@ -11,10 +11,9 @@ import (
 )
 
 // TODO:
-//  try to add sll mode to postgres database (docker)
-//  use config var as flags
 //  flag PORT = 3000
 //  flag URL_PREFIX = "api/v1/"
+// *try to add sll mode to postgres database (docker)
 
 type appConfig struct {
 	// Relative migration directory path
@@ -22,6 +21,9 @@ type appConfig struct {
 
 	// Data base config
 	dbConfig dbConfig
+
+	// todo specify
+	port string
 }
 
 type dbConfig struct {
@@ -47,6 +49,7 @@ func main() {
 
 func configure(config *appConfig) {
 	var migrationsDir = flag.String("mdir", "./db/migrations", "Directory where the migration files are located")
+	var port = flag.String("p", "3000", "Application deployment port")
 
 	var dbType = flag.String("db.type", "postgres", "Database type")
 	var dbUser = flag.String("db.user", "postuser", "Database user")
@@ -61,6 +64,7 @@ func configure(config *appConfig) {
 
 	config.migrationsDir = *migrationsDir
 	config.dbConfig = dbConfig{dbType: *dbType, dataSource: ds}
+	config.port = *port
 }
 
 func applyMigrations(config appConfig) {
