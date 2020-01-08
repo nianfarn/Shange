@@ -7,7 +7,9 @@ import (
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/golang-migrate/migrate/source/file"
+	"github.com/gorilla/mux"
 	"log"
+	"net/http"
 )
 
 // TODO:
@@ -22,8 +24,10 @@ type appConfig struct {
 	// Data base config
 	dbConfig dbConfig
 
-	// todo specify
 	port string
+
+	// Api prefix
+	apiPrefix string
 }
 
 type dbConfig struct {
@@ -37,19 +41,33 @@ type dbConfig struct {
 func main() {
 	config := appConfig{}
 	configure(&config)
-	applyMigrations(config)
 
-	//http.Handle(urlPrefix + "users", http.HandlerFunc(userHandler))
-	//
-	//entryUrl := ":" + strconv.Itoa(port)
-	//if err := http.ListenAndServe(entryUrl, http.HandlerFunc(entryHandler)); err != nil {
-	//	log.Fatalf("could not listen on port %v with: %v", port, err)
-	//}
+	applyMigrations(config)
+	setupDispatcher(config)
+
+	startServer(config)
+}
+
+func startServer(config appConfig) {
+	if err := http.ListenAndServe(":"+config.port, http.HandlerFunc(entryHandler)); err != nil {
+		log.Fatalf("could not listen on port %v with: %v", config.port, err)
+	}
+}
+
+func setupDispatcher(config appConfig) {
+	r := mux.NewRouter()
+
+	//r.Methods().Subrouter()
+	r.HandleFunc("/users/{id:[0-9]+}", userHandler).
+		Methods("GET", "POST", "DELETE")
+
+	http.Handle("/", r)
 }
 
 func configure(config *appConfig) {
 	var migrationsDir = flag.String("mdir", "./db/migrations", "Directory where the migration files are located")
 	var port = flag.String("p", "3000", "Application deployment port")
+	var prefix = flag.String("prefix", "api/v1/", "Special prefix for api paths")
 
 	var dbType = flag.String("db.type", "postgres", "Database type")
 	var dbUser = flag.String("db.user", "postuser", "Database user")
@@ -65,15 +83,10 @@ func configure(config *appConfig) {
 	config.migrationsDir = *migrationsDir
 	config.dbConfig = dbConfig{dbType: *dbType, dataSource: ds}
 	config.port = *port
+	config.apiPrefix = *prefix
 }
 
 func applyMigrations(config appConfig) {
-	// todo use newest postgres driver
-	//config, err := pgx.ParseConnectionString(dataSourceName)
-	//if err != nil {
-	//
-	//}
-	//sql.Register("postgres-pgx", pgx.ParseConnectionString(dataSourceName))
 	db, err := sql.Open(config.dbConfig.dbType, config.dbConfig.dataSource)
 	if err != nil {
 		log.Fatalf("could not connect to the database... %v", err)
