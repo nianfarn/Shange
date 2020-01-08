@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
@@ -13,14 +14,28 @@ import (
 //  try to add sll mode to postgres database (docker)
 //  use config var as flags
 //  flag PORT = 3000
-//  flag PORT = 3000
 //  flag URL_PREFIX = "api/v1/"
 
-const migrationsDir = "./db/migrations"
-const dataSourceName = "postgres://postuser:postpass@localhost:5432/shange-db?sslmode=disable"
+type appConfig struct {
+	// Relative migration directory path
+	migrationsDir string
+
+	// Data base config
+	dbConfig dbConfig
+}
+
+type dbConfig struct {
+	// DB type (postgres or another)
+	dbType string
+
+	// Data source
+	dataSource string
+}
 
 func main() {
-	migrations()
+	config := appConfig{}
+	configure(&config)
+	applyMigrations(config)
 
 	//http.Handle(urlPrefix + "users", http.HandlerFunc(userHandler))
 	//
@@ -30,18 +45,32 @@ func main() {
 	//}
 }
 
-func migrations() {
-	//var migrationDir = flag.String("migration.files", migrationsDir, "Directory where the migration files are located")
-	//var dataSource = flag.String("postgres.dsn", dataSourceName, "Postgres data source")
-	//flag.Parse()
+func configure(config *appConfig) {
+	var migrationsDir = flag.String("mdir", "./db/migrations", "Directory where the migration files are located")
 
+	var dbType = flag.String("db.type", "postgres", "Database type")
+	var dbUser = flag.String("db.user", "postuser", "Database user")
+	var dbPwd = flag.String("db.pwd", "postpass", "Database user password")
+	var dbHost = flag.String("db.host", "localhost", "Database host")
+	var dbPort = flag.String("db.port", "5432", "Database port")
+	var dbName = flag.String("db.name", "shange-db", "Database name")
+
+	flag.Parse()
+
+	ds := fmt.Sprintf("%s://%s:%s@%s:%s/%s?sslmode=disable", *dbType, *dbUser, *dbPwd, *dbHost, *dbPort, *dbName)
+
+	config.migrationsDir = *migrationsDir
+	config.dbConfig = dbConfig{dbType: *dbType, dataSource: ds}
+}
+
+func applyMigrations(config appConfig) {
 	// todo use newest postgres driver
 	//config, err := pgx.ParseConnectionString(dataSourceName)
 	//if err != nil {
 	//
 	//}
 	//sql.Register("postgres-pgx", pgx.ParseConnectionString(dataSourceName))
-	db, err := sql.Open("postgres", dataSourceName)
+	db, err := sql.Open(config.dbConfig.dbType, config.dbConfig.dataSource)
 	if err != nil {
 		log.Fatalf("could not connect to the database... %v", err)
 	}
@@ -54,9 +83,8 @@ func migrations() {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsDir),
-		"postgres", driver)
-	m.Steps(2)
+		fmt.Sprintf("file://%s", config.migrationsDir),
+		config.dbConfig.dbType, driver)
 	if err != nil {
 		log.Fatalf("migration failed... %v", err)
 	}
