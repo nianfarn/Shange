@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/golang-migrate/migrate v3.5.4+incompatible
-	github.com/gorilla/mux v1.7.3 // indirect
+	github.com/gorilla/mux v1.7.3
 	github.com/jackc/pgx v3.6.0+incompatible // indirect
 	github.com/lib/pq v1.3.0 // indirect
 	github.com/pkg/errors v0.8.1 // indirect

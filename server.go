@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
 	. "net/http"
 )
 
@@ -16,9 +15,9 @@ func (e *httpError) response(w ResponseWriter) {
 }
 
 func userHandler(w ResponseWriter, r *Request) {
-	vars := mux.Vars(r)
+	//vars := mux.Vars(r)
 
-	id := vars["id"]
+	//id := vars["id"]
 
 	switch r.Method {
 	case MethodPost:
@@ -73,11 +72,6 @@ func validateCreateRequest(r *Request) *httpError {
 	}
 
 	return nil
-}
-
-func entryHandler(w ResponseWriter, r *Request) {
-	// todo remove
-	w.Write([]byte("<h1>Hello there, i'm started listening</h1>"))
 }
 
 // Makes the response with payload in JSON

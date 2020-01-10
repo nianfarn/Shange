@@ -9,12 +9,12 @@ import (
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/gorilla/mux"
 	"log"
-	"net/http"
+	. "net/http"
+	"os"
+	"time"
 )
 
 // TODO:
-//  flag PORT = 3000
-//  flag URL_PREFIX = "api/v1/"
 // *try to add sll mode to postgres database (docker)
 
 type appConfig struct {
@@ -24,10 +24,13 @@ type appConfig struct {
 	// Data base config
 	dbConfig dbConfig
 
+	host string
 	port string
 
 	// Api prefix
 	apiPrefix string
+
+	timeout time.Duration
 }
 
 type dbConfig struct {
@@ -43,31 +46,56 @@ func main() {
 	configure(&config)
 
 	applyMigrations(config)
-	setupDispatcher(config)
-
-	startServer(config)
+	server(config)
 }
 
-func startServer(config appConfig) {
-	if err := http.ListenAndServe(":"+config.port, http.HandlerFunc(entryHandler)); err != nil {
-		log.Fatalf("could not listen on port %v with: %v", config.port, err)
-	}
-}
-
-func setupDispatcher(config appConfig) {
+func server(config appConfig) {
 	r := mux.NewRouter()
 
-	//r.Methods().Subrouter()
-	r.HandleFunc("/users/{id:[0-9]+}", userHandler).
-		Methods("GET", "POST", "DELETE")
+	sr := r.PathPrefix(config.apiPrefix).Subrouter()
+	sr.HandleFunc("/users/{id:[0-9]+}", userHandler).
+		Methods(MethodGet, MethodPost, MethodDelete)
 
-	http.Handle("/", r)
+	domainUrl := fmt.Sprintf("%s:%s", config.host, config.port)
+	srv := &Server{
+		Addr:         domainUrl,
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+		Handler:      r,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Println(err)
+	}
+
+	// TODO check out graceful shutdown
+
+	//go func() {
+	//	if err := srv.ListenAndServe(); err != nil {
+	//		log.Println(err)
+	//	}
+	//}()
+	//
+	//c := make(chan os.Signal, 1)
+	//signal.Notify(c, os.Interrupt)
+	//<-c
+	//
+	//// Create a deadline to wait for.
+	//ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+	//defer cancel()
+	//if err := srv.Shutdown(ctx); err != nil {
+	//	log.Fatal(err)
+	//}
+	os.Exit(0)
 }
 
 func configure(config *appConfig) {
 	var migrationsDir = flag.String("mdir", "./db/migrations", "Directory where the migration files are located")
+	var host = flag.String("h", "localhost", "Application deployment host")
 	var port = flag.String("p", "3000", "Application deployment port")
-	var prefix = flag.String("prefix", "api/v1/", "Special prefix for api paths")
+	var prefix = flag.String("prefix", "/api/v1/", "Special prefix for api paths")
+	var timeout = flag.Duration("timeout", time.Second*15, "The duration for which the server gracefully wait for existing connections to finish")
 
 	var dbType = flag.String("db.type", "postgres", "Database type")
 	var dbUser = flag.String("db.user", "postuser", "Database user")
@@ -82,8 +110,10 @@ func configure(config *appConfig) {
 
 	config.migrationsDir = *migrationsDir
 	config.dbConfig = dbConfig{dbType: *dbType, dataSource: ds}
+	config.host = *host
 	config.port = *port
 	config.apiPrefix = *prefix
+	config.timeout = *timeout
 }
 
 func applyMigrations(config appConfig) {
